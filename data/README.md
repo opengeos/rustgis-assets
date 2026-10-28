@@ -13,3 +13,13 @@ embeds these at build time for its World Atlas sample project and basemap outlin
 | `lakes.geojson` | Natural Earth, Lakes | Public domain |
 
 Source: <https://www.naturalearthdata.com/>
+
+## Data cube catalog
+
+`data-cubes.json` is the catalog of data cubes that RustGIS's Data Cubes pane and `cube.catalog`
+list (opengeos/RustGIS#683). RustGIS has a copy built in (`crates/tiles/src/cubes.json`) and reads
+this one once per run, so a cube can be added or an address fixed without a new release. A list
+that doesn't read whole (over 1 MB, more than 500 entries, or an entry that fails the built-in
+list's checks) is ignored, and the built-in copy is used. Keep it in step with
+`crates/tiles/src/cubes.json`; the entry format is described in RustGIS's
+`docs/user-guide/web-data.md`.

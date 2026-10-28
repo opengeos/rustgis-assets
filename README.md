@@ -15,7 +15,7 @@ url:    https://assets.rustgis.app/images/hero.webp
 | Directory | Contents                                   |
 | --------- | ------------------------------------------ |
 | `images/` | Screenshots, logos and other images         |
-| `data/`   | Sample datasets (Natural Earth GeoJSON)     |
+| `data/`   | Sample datasets (Natural Earth GeoJSON) and the data cube catalog |
 | `fonts/`  | CJK fonts for the web app (Noto Sans, OFL)  |
 
 ## Adding files
