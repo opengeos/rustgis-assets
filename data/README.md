@@ -6,7 +6,7 @@ embeds these at build time for its World Atlas sample project and basemap outlin
 
 | File | Source | Licence |
 | --- | --- | --- |
-| `countries.geojson` | Natural Earth, Admin 0 – Countries | Public domain |
+| `countries.geojson` | Natural Earth, Admin 0 – Countries; Crimea (with Sevastopol) moved from Russia into Ukraine, within its internationally recognised borders (UN General Assembly resolution 68/262) | Public domain |
 | `countries_chn.geojson` | Natural Earth, Admin 0 – Countries, China point of view (1:10m, simplified to 1:110m density; Hong Kong and Macao merged into China) | Public domain |
 | `cities.geojson` | Natural Earth, Populated Places (simple) | Public domain |
 | `rivers.geojson` | Natural Earth, Rivers + lake centerlines | Public domain |
