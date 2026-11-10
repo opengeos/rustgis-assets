@@ -29,7 +29,7 @@ list's checks) is ignored, and the built-in copy is used. Keep it in step with
 
 The countries as each of Natural Earth's 31 points of view sees disputed borders aren't kept here:
 they are on source.coop, at
-`https://data.source.coop/giswqs/opengeos/rustgis/worldviews/countries_<code>.geojson`
+`https://data.source.coop/opengeos/data/rustgis/worldviews/countries_<code>.geojson`
 (`arg`, `bdg`, `bra`, `chn`, `deu`, `egy`, `esp`, `fra`, `gbr`, `grc`, `idn`, `ind`, `isr`, `ita`,
 `jpn`, `kor`, `mar`, `nep`, `nld`, `pak`, `pol`, `prt`, `pse`, `rus`, `sau`, `swe`, `tur`, `twn`,
 `ukr`, `usa`, `vnm`). RustGIS downloads one when it is chosen in Settings › Language › Worldview;

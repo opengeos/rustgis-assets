@@ -2,7 +2,7 @@
 
 Natural Earth publishes Admin 0 Countries as each of 31 countries sees disputed borders, at
 1:10m only. RustGIS downloads one of these files when someone picks that worldview (from
-source.coop: https://data.source.coop/giswqs/opengeos/rustgis/worldviews/), so each is reduced to the size and attributes of data/countries.geojson (the 1:110m countries):
+source.coop: https://data.source.coop/opengeos/data/rustgis/worldviews/), so each is reduced to the size and attributes of data/countries.geojson (the 1:110m countries):
 
 1. Each 1:10m piece is grouped by the view's own country code (``ADM0_A3_<xx>``); Hong Kong and
    Macao join the group holding mainland China, as at 1:110m.
@@ -16,8 +16,8 @@ source.coop: https://data.source.coop/giswqs/opengeos/rustgis/worldviews/), so e
 Usage:
     python scripts/worldviews.py NE_GEOJSON_DIR OUT_DIR
 
-Then upload OUT_DIR's files to source.coop's giswqs/opengeos repository, under rustgis/worldviews/
-(for example ``aws s3 cp OUT_DIR s3://giswqs/opengeos/rustgis/worldviews/ --recursive
+Then upload OUT_DIR's files to source.coop's opengeos/data repository, under rustgis/worldviews/
+(for example ``aws s3 cp OUT_DIR s3://opengeos/data/rustgis/worldviews/ --recursive
 --endpoint-url https://data.source.coop`` with that repository's credentials).
 
 NE_GEOJSON_DIR holds ``ne_10m_admin_0_countries_<pov>.geojson`` and
