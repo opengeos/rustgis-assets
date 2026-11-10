@@ -29,6 +29,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 
 import geopandas as gpd
@@ -44,6 +45,9 @@ POVS = {
     "prt": "PT", "pse": "PS", "rus": "RU", "sau": "SA", "swe": "SE", "tur": "TR", "twn": "TW",
     "ukr": "UA", "usa": "US", "vnm": "VN",
 }
+
+# Touching tests buffer by 0.01° on purpose: a geographic distance is what is meant.
+warnings.filterwarnings("ignore", message="Geometry is in a geographic CRS")
 
 # Pieces too small for 1:110m that belong with mainland China's group, as they do at 1:110m.
 WITH_CHINA = {"HKG", "MAC"}
@@ -115,11 +119,16 @@ def build(pov, ne_dir, attrs, work, out_dir):
     """
     field = "ADM0_A3_" + POVS[pov]
     g = gpd.read_file(Path(ne_dir) / f"ne_10m_admin_0_countries_{pov}.geojson")
-    china = g.loc[g["ADM0_A3"] == "CHN", field]
-    china_group = china.iloc[0] if len(china) else "CHN"
+    g["km2"] = g.to_crs(EQUAL_AREA).area / 1e6
+    # Mainland China's group: the largest piece bordering Hong Kong (its code is TWN in Taiwan's
+    # view, where no piece is coded CHN).
+    hong_kong = g[g["ADM0_A3"] == "HKG"].union_all()
+    near = g[~g["ADM0_A3"].isin(WITH_CHINA) & g.buffer(0.01).intersects(hong_kong)]
+    if near.empty:
+        raise SystemExit(f"{pov}: no piece borders Hong Kong")
+    china_group = near.sort_values("km2", ascending=False)[field].iloc[0]
     g["K"] = [china_group if a in WITH_CHINA else k for a, k in zip(g["ADM0_A3"], g[field])]
     # Each group's attributes: its largest piece's 1:110m country, else Natural Earth's own.
-    g["km2"] = g.to_crs(EQUAL_AREA).area / 1e6
     props, unknown = {}, []
     for key, part in g.groupby("K"):
         part = part.sort_values("km2", ascending=False)
