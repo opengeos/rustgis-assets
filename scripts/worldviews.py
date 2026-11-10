@@ -1,8 +1,8 @@
-"""Build data/worldviews/countries_<pov>.geojson from Natural Earth's point-of-view countries.
+"""Build countries_<pov>.geojson for each of Natural Earth's point-of-view countries.
 
 Natural Earth publishes Admin 0 Countries as each of 31 countries sees disputed borders, at
-1:10m only. RustGIS downloads one of these files when someone picks that worldview, so each is
-reduced to the size and attributes of data/countries.geojson (the 1:110m countries):
+1:10m only. RustGIS downloads one of these files when someone picks that worldview (from
+source.coop: https://data.source.coop/giswqs/opengeos/rustgis/worldviews/), so each is reduced to the size and attributes of data/countries.geojson (the 1:110m countries):
 
 1. Each 1:10m piece is grouped by the view's own country code (``ADM0_A3_<xx>``); Hong Kong and
    Macao join the group holding mainland China, as at 1:110m.
@@ -14,7 +14,11 @@ reduced to the size and attributes of data/countries.geojson (the 1:110m countri
    islands such as Mauritius) are dropped, as at 1:110m.
 
 Usage:
-    python scripts/worldviews.py NE_GEOJSON_DIR
+    python scripts/worldviews.py NE_GEOJSON_DIR OUT_DIR
+
+Then upload OUT_DIR's files to source.coop's giswqs/opengeos repository, under rustgis/worldviews/
+(for example ``aws s3 cp OUT_DIR s3://giswqs/opengeos/rustgis/worldviews/ --recursive
+--endpoint-url https://data.source.coop`` with that repository's credentials).
 
 NE_GEOJSON_DIR holds ``ne_10m_admin_0_countries_<pov>.geojson`` and
 ``ne_110m_admin_0_countries.geojson`` from https://github.com/nvkelso/natural-earth-vector
@@ -31,7 +35,6 @@ import geopandas as gpd
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
-OUT = DATA / "worldviews"
 
 # Natural Earth's file code for each point of view, and the suffix of its ADM0_A3 field.
 POVS = {
@@ -97,7 +100,7 @@ def own_attributes(row):
     }
 
 
-def build(pov, ne_dir, attrs, work):
+def build(pov, ne_dir, attrs, work, out_dir):
     """Builds one worldview's countries file.
 
     Args:
@@ -105,6 +108,7 @@ def build(pov, ne_dir, attrs, work):
         ne_dir: Folder holding Natural Earth's GeoJSON files.
         attrs: The 1:110m attributes by ADM0_A3 code, from small_scale_attributes.
         work: A scratch folder.
+        out_dir: The folder the file is written to.
 
     Returns:
         The number of features and vertices written.
@@ -145,21 +149,22 @@ def build(pov, ne_dir, attrs, work):
         if p is not None and f["geometry"] is not None:
             features.append({"type": "Feature", "properties": {k: p[k] for k in FIELDS}, "geometry": f["geometry"]})
     features.sort(key=lambda f: f["properties"]["name"])
-    OUT.mkdir(exist_ok=True)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     text = json.dumps({"type": "FeatureCollection", "features": features}, separators=(",", ":"), ensure_ascii=False)
-    (OUT / f"countries_{pov}.geojson").write_text(text + "\n")
+    (out_dir / f"countries_{pov}.geojson").write_text(text + "\n")
     vertices = text.count("],[") + len(features)
     return len(features), vertices
 
 
 def main():
-    """Builds every worldview from the Natural Earth folder named on the command line."""
-    if len(sys.argv) != 2:
+    """Builds every worldview from the Natural Earth folder into the output folder named."""
+    if len(sys.argv) != 3:
         raise SystemExit(__doc__)
     attrs = small_scale_attributes(sys.argv[1])
     with tempfile.TemporaryDirectory() as work:
         for pov in POVS:
-            n, v = build(pov, sys.argv[1], attrs, work)
+            n, v = build(pov, sys.argv[1], attrs, work, sys.argv[2])
             print(f"{pov}: {n} countries, ~{v} vertices")
 
 
