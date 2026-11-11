@@ -1,30 +1,46 @@
 """Build countries_<pov>.geojson for each of Natural Earth's point-of-view countries.
 
 Natural Earth publishes Admin 0 Countries as each of 31 countries sees disputed borders, at
-1:10m only. RustGIS downloads one of these files when someone picks that worldview (from
-source.coop: https://data.source.coop/opengeos/data/rustgis/worldviews/), so each is reduced to the size and attributes of data/countries.geojson (the 1:110m countries):
+1:10m only. RustGIS downloads one of these files when someone picks that worldview, from
+source.coop (https://data.source.coop/opengeos/data/rustgis/worldviews/), in one of two
+versions, both with the attributes of data/countries.geojson (the 1:110m countries):
+
+- ``countries_<pov>.geojson``, the default: simplified to the size of data/countries.geojson, as
+  below.
+- ``original/countries_<pov>.geojson.gz``: Natural Earth's 1:10m shapes, every island and
+  territory kept (those with no 1:110m country carry Natural Earth's own name and figures),
+  coordinates to 4 decimals (about 11 m, finer than the 1:10m data), gzipped (about 3 MB, 10 MB
+  unpacked).
+
+``original/countries_default.geojson.gz`` is the same for Natural Earth's de facto countries
+(``ne_10m_admin_0_countries.geojson``), the original of the countries built into RustGIS.
+
+Both:
 
 1. Each 1:10m piece is grouped by the view's own country code (``ADM0_A3_<xx>``); Hong Kong and
    Macao join the group holding mainland China, as at 1:110m.
-2. The groups are dissolved, islands under 1,500 km² dropped and the shapes simplified with
-   mapshaper (``-simplify 1.5% keep-shapes``, 3 decimals), close to the 1:110m vertex density.
-3. A group takes the attributes of its largest piece's country in data/countries.geojson. A group
-   with no 1:110m country (Abkhazia in Russia's view, Bir Tawil) is kept when it is land next to
-   one and covers at least 1,500 km², with Natural Earth's own name and figures; others (small
-   islands such as Mauritius) are dropped, as at 1:110m.
+2. The groups are dissolved (mapshaper ``-dissolve2``) and take the attributes of their largest
+   piece's country in data/countries.geojson.
+
+The simplified version also drops islands under 1,500 km² and simplifies the shapes with mapshaper
+(``-simplify 1.5% keep-shapes``, 3 decimals), close to the 1:110m vertex density. A group with no
+1:110m country (Abkhazia in Russia's view, Bir Tawil) is kept there when it is land next to one
+and covers at least 1,500 km², with Natural Earth's own name and figures; others (small islands
+such as Mauritius) are dropped, as at 1:110m.
 
 Usage:
     python scripts/worldviews.py NE_GEOJSON_DIR OUT_DIR
 
-Then upload OUT_DIR's files to source.coop's opengeos/data repository, under rustgis/worldviews/
-(for example ``aws s3 cp OUT_DIR s3://opengeos/data/rustgis/worldviews/ --recursive
+It writes the simplified files to OUT_DIR and the original ones to OUT_DIR/original. Then upload
+OUT_DIR to source.coop's opengeos/data repository, as rustgis/worldviews/ (for example ``aws s3 cp OUT_DIR s3://opengeos/data/rustgis/worldviews/ --recursive
 --endpoint-url https://data.source.coop`` with that repository's credentials).
 
-NE_GEOJSON_DIR holds ``ne_10m_admin_0_countries_<pov>.geojson`` and
-``ne_110m_admin_0_countries.geojson`` from https://github.com/nvkelso/natural-earth-vector
+NE_GEOJSON_DIR holds ``ne_10m_admin_0_countries_<pov>.geojson``,
+``ne_10m_admin_0_countries.geojson`` and ``ne_110m_admin_0_countries.geojson`` from https://github.com/nvkelso/natural-earth-vector
 (``geojson/``). Needs geopandas and mapshaper (``npx mapshaper``).
 """
 
+import gzip
 import json
 import subprocess
 import sys
@@ -104,7 +120,7 @@ def own_attributes(row):
     }
 
 
-def build(pov, ne_dir, attrs, work, out_dir):
+def build(pov, ne_dir, attrs, work, out_dir, original):
     """Builds one worldview's countries file.
 
     Args:
@@ -113,12 +129,15 @@ def build(pov, ne_dir, attrs, work, out_dir):
         attrs: The 1:110m attributes by ADM0_A3 code, from small_scale_attributes.
         work: A scratch folder.
         out_dir: The folder the file is written to.
+        original: Keep Natural Earth's 1:10m shapes and every group, rather than simplifying.
 
     Returns:
         The number of features and vertices written.
     """
-    field = "ADM0_A3_" + POVS[pov]
-    g = gpd.read_file(Path(ne_dir) / f"ne_10m_admin_0_countries_{pov}.geojson")
+    # The default countries are grouped by each piece's own code.
+    field = "ADM0_A3_" + POVS[pov] if pov in POVS else "ADM0_A3"
+    name = f"ne_10m_admin_0_countries_{pov}.geojson" if pov in POVS else "ne_10m_admin_0_countries.geojson"
+    g = gpd.read_file(Path(ne_dir) / name)
     g["km2"] = g.to_crs(EQUAL_AREA).area / 1e6
     # Mainland China's group: the largest piece bordering Hong Kong (its code is TWN in Taiwan's
     # view, where no piece is coded CHN).
@@ -135,20 +154,22 @@ def build(pov, ne_dir, attrs, work, out_dir):
         known = [a for a in part["ADM0_A3"] if a in attrs]
         if known:
             props[key] = attrs[known[0]]
-        elif part["km2"].sum() >= MIN_KM2 and isinstance(part.iloc[0]["NAME"], str):
+        elif isinstance(part.iloc[0]["NAME"], str) and (original or part["km2"].sum() >= MIN_KM2):
             unknown.append((key, own_attributes(part.iloc[0])))
     # A group with no 1:110m country is kept only on land next to one (disputed land such as
     # Abkhazia); islands without one, such as Mauritius, aren't in the 1:110m countries either.
     known_land = g[g["K"].isin(props)].union_all()
     for key, p in unknown:
-        if g[g["K"] == key].buffer(0.01).intersects(known_land).any():
+        if original or g[g["K"] == key].buffer(0.01).intersects(known_land).any():
             props[key] = p
     src, out = Path(work) / f"{pov}_in.geojson", Path(work) / f"{pov}_out.geojson"
     g[["K", "geometry"]].to_file(src, driver="GeoJSON")
+    steps = ["-o", str(out), "precision=0.0001", "format=geojson"]
+    if not original:
+        steps = ["-filter-islands", "min-area=1500km2", "remove-empty", "-simplify", "1.5%", "keep-shapes",
+                 "-o", str(out), "precision=0.001", "format=geojson"]
     subprocess.run(
-        ["npx", "--yes", "mapshaper@0.7.101", "-i", str(src), "-dissolve2", "K",
-         "-filter-islands", "min-area=1500km2", "remove-empty", "-simplify", "1.5%", "keep-shapes",
-         "-o", str(out), "precision=0.001", "format=geojson"],
+        ["npx", "--yes", "mapshaper@0.7.101", "-i", str(src), "-dissolve2", "K", *steps],
         check=True, capture_output=True,
     )
     shapes = json.loads(out.read_text())["features"]
@@ -161,7 +182,11 @@ def build(pov, ne_dir, attrs, work, out_dir):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     text = json.dumps({"type": "FeatureCollection", "features": features}, separators=(",", ":"), ensure_ascii=False)
-    (out_dir / f"countries_{pov}.geojson").write_text(text + "\n")
+    if original:
+        # mtime=0 so the same input gives the same bytes.
+        (out_dir / f"countries_{pov}.geojson.gz").write_bytes(gzip.compress((text + "\n").encode(), 9, mtime=0))
+    else:
+        (out_dir / f"countries_{pov}.geojson").write_text(text + "\n")
     vertices = text.count("],[") + len(features)
     return len(features), vertices
 
@@ -172,9 +197,14 @@ def main():
         raise SystemExit(__doc__)
     attrs = small_scale_attributes(sys.argv[1])
     with tempfile.TemporaryDirectory() as work:
-        for pov in POVS:
-            n, v = build(pov, sys.argv[1], attrs, work, sys.argv[2])
-            print(f"{pov}: {n} countries, ~{v} vertices")
+        for pov in [*POVS, "default"]:
+            # The default's simplified countries are data/countries.geojson, built into RustGIS.
+            versions = [(True, Path(sys.argv[2]) / "original")]
+            if pov != "default":
+                versions.insert(0, (False, Path(sys.argv[2])))
+            for original, out_dir in versions:
+                n, v = build(pov, sys.argv[1], attrs, work, out_dir, original)
+                print(f"{pov}{' (original)' if original else ''}: {n} countries, ~{v} vertices")
 
 
 if __name__ == "__main__":
