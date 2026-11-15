@@ -6,6 +6,7 @@ Japanese, Korean or Persian (browsers can't read installed fonts; the desktop ap
 | File | Font | Licence |
 | --- | --- | --- |
 | `NotoSansSC-Regular.otf` | Noto Sans SC (Simplified Chinese subset) | SIL Open Font License 1.1 |
+| `NotoSansTC-Regular.otf` | Noto Sans TC (Traditional Chinese subset, Taiwan's glyph forms) | SIL Open Font License 1.1 |
 | `NotoSansJP-Regular.otf` | Noto Sans JP (Japanese subset) | SIL Open Font License 1.1 |
 | `NotoSansKR-Regular.otf` | Noto Sans KR (Korean subset) | SIL Open Font License 1.1 |
 | `Vazirmatn-Regular.ttf` | Vazirmatn (Arabic script with Latin) | SIL Open Font License 1.1 |
